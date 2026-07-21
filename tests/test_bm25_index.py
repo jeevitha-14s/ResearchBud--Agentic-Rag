@@ -63,3 +63,17 @@ def test_save_and_load_roundtrip(tmp_path: Path) -> None:
     loaded = Bm25Index.load(path)
     results = loaded.search("transformer language models", top_k=3)
     assert results[0][0] == 2
+
+
+def test_build_on_empty_corpus_does_not_raise() -> None:
+    index = Bm25Index.build([])
+    assert index.search("anything", top_k=5) == []
+
+
+def test_empty_index_save_and_load_roundtrip(tmp_path: Path) -> None:
+    index = Bm25Index.build([])
+    path = str(tmp_path / "empty.pkl")
+    index.save(path)
+
+    loaded = Bm25Index.load(path)
+    assert loaded.search("anything", top_k=5) == []

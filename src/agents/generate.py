@@ -17,7 +17,7 @@ NO_CONTEXT_ANSWER = (
 )
 
 
-def _build_user_prompt(query: str, chunks: list[tuple[str, str, str]]) -> str:
+def build_generation_prompt(query: str, chunks: list[tuple[str, str, str]]) -> str:
     context = "\n\n".join(
         f"[{title}, arXiv:{arxiv_id}]\n{text}" for title, arxiv_id, text in chunks
     )
@@ -34,7 +34,7 @@ def make_generate_node(llm_client: LLMClient) -> Callable[[AgentState], dict[str
                 "trace": [*state["trace"], "generate:no_context"],
             }
 
-        prompt = _build_user_prompt(
+        prompt = build_generation_prompt(
             state["original_query"],
             [(r.title, r.arxiv_id, r.text) for r in graded],
         )

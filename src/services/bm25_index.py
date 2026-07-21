@@ -14,18 +14,26 @@ def tokenize(text: str) -> list[str]:
 
 
 class Bm25Index:
-    def __init__(self, bm25: BM25Okapi, chunk_ids: list[int]) -> None:
+    def __init__(self, bm25: BM25Okapi | None, chunk_ids: list[int]) -> None:
         self._bm25 = bm25
         self._chunk_ids = chunk_ids
 
     @classmethod
     def build(cls, chunks: list[Chunk]) -> "Bm25Index":
+        if not chunks:
+            # BM25Okapi divides by corpus size internally and raises
+            # ZeroDivisionError on an empty corpus rather than handling it —
+            # an empty index should just mean "search returns nothing", not
+            # a crash.
+            return cls(None, [])
         tokenized_corpus = [tokenize(chunk.text) for chunk in chunks]
         bm25 = BM25Okapi(tokenized_corpus)
         chunk_ids = [chunk.id for chunk in chunks if chunk.id is not None]
         return cls(bm25, chunk_ids)
 
     def search(self, query: str, top_k: int) -> list[tuple[int, float]]:
+        if self._bm25 is None:
+            return []
         scores = self._bm25.get_scores(tokenize(query))
         ranked = sorted(zip(self._chunk_ids, scores, strict=True), key=lambda pair: -pair[1])
         return [(chunk_id, float(score)) for chunk_id, score in ranked[:top_k] if score > 0]
