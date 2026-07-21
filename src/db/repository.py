@@ -119,3 +119,9 @@ class ChunkRepository:
     def get_all(self) -> list[Chunk]:
         rows = self._conn.execute("SELECT * FROM chunks ORDER BY id").fetchall()
         return [_row_to_chunk(row) for row in rows]
+
+    def count_by_paper_all(self) -> dict[int, int]:
+        rows = self._conn.execute(
+            "SELECT paper_id, COUNT(*) AS chunk_count FROM chunks GROUP BY paper_id"
+        ).fetchall()
+        return {row["paper_id"]: row["chunk_count"] for row in rows}

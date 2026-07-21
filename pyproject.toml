@@ -18,6 +18,7 @@ dependencies = [
     "langfuse>=2.53",
     "redis>=5.2",
     "slowapi>=0.1.9",
+    "streamlit>=1.38",
 ]
 
 [dependency-groups]

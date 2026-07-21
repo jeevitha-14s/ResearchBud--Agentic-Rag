@@ -6,7 +6,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from src.routers import chat, health, search
+from src.routers import chat, health, papers, search
 from src.services.rate_limit import limiter
 from src.services.tracing import flush_traces
 
@@ -25,3 +25,4 @@ app.add_middleware(SlowAPIMiddleware)
 app.include_router(health.router)
 app.include_router(search.router)
 app.include_router(chat.router)
+app.include_router(papers.router)

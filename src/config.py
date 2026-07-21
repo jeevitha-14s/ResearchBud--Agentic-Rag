@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     redis_cache_ttl_seconds: int = 3600
     rate_limit_search: str = "30/minute"
     rate_limit_chat: str = "10/minute"
+    rate_limit_ingest: str = "5/minute"
 
 
 settings = Settings()

@@ -273,3 +273,56 @@ verification, not invented:
    `conftest.py`, before any `src.*` import, exploiting the fact that
    `load_dotenv()` doesn't override an already-set env var. Verified via
    before/after trace-timestamp checks against the real Langfuse API.
+
+## Phase 6: Streamlit Frontend (chat + upload/status)
+
+**What we built:** the first user-facing surface — `streamlit_app/Home.py`
+(landing + live health check), `pages/1_Chat.py` (multi-turn chat with an
+inline `st.expander` reasoning trace per message, never a separate page),
+`pages/2_Upload_Status.py` (arXiv-query ingestion form, reindex button,
+papers table), and a shared `api_client.py` that's the *only* place the
+frontend talks to the backend. Also added the backend surface the UI
+needed that didn't exist yet: `POST /ingest`, `POST /reindex`,
+`GET /papers` (`src/routers/papers.py`) — ingestion and indexing were
+CLI-only through Phase 5. 95 tests total (11 new — new endpoints plus
+Streamlit pages tested via `streamlit.testing.v1.AppTest` with a mocked
+`api_client`, verified in isolation first that mocking reaches AppTest's
+in-process execution before relying on it). Verified fully live in an
+actual browser: ingested a real new paper via the UI, rebuilt indices via
+the UI, then asked about that exact paper in chat and got a correctly
+cited answer with the reasoning trace visible in the inline expander.
+
+**Alternatives considered:**
+- `st.tabs()` single page or a sidebar mode-selector instead of Streamlit's
+  native `pages/` directory.
+- A separate trace page/tab instead of an inline `st.expander`.
+- Real `st.file_uploader` PDF upload instead of arXiv-query-triggered
+  ingestion.
+- A background task queue + polling instead of synchronous ingest/reindex
+  calls.
+- Importing `src.config.settings` directly in the frontend instead of the
+  frontend owning its own `API_BASE_URL`.
+
+**Why we chose what we chose:**
+- Native `pages/` directory + inline expander: both are direct matches to
+  CLAUDE.md's own wording — "chat page... + upload/status page" (two
+  pages, not two tabs) and "trace shown inline rather than as a separate
+  page."
+- arXiv-query ingestion, not file upload: the backend's entire ingestion
+  pipeline is arXiv-API-driven with no PDF-upload code path; building one
+  would be new backend work out of scope for a frontend phase.
+- Synchronous ingest/reindex: every other endpoint in the project is
+  synchronous; a task queue for two admin-triggered actions would be new
+  infrastructure that contradicts the project's minimal-infra theme.
+- Frontend owns `API_BASE_URL`, doesn't import backend config: the actual
+  point of "thin client, no business logic" is that the frontend could be
+  deployed as a genuinely separate process — it should know nothing about
+  Qdrant hosts, LLM providers, or any other backend-internal config.
+
+**Real problems hit:** none — this phase went cleanly. Every new endpoint
+and page worked as designed on first live verification (ingest → reindex
+→ chat → inline trace, all through the actual browser UI). The only hiccup
+(port 8501 already in use) was an unrelated pre-existing process on the
+dev machine, not a project defect, so it isn't recorded as a real failure
+per the project's own rule against inventing incidents that didn't happen
+in the code.

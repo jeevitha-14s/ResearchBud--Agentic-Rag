@@ -11,13 +11,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 
-def build_indices() -> None:
+def build_indices() -> int:
     with get_connection() as conn:
         chunks = ChunkRepository(conn).get_all()
 
     if not chunks:
         logger.warning("No chunks found in SQLite — run ingestion first.")
-        return
+        return 0
 
     logger.info("Building BM25 index over %d chunks", len(chunks))
     bm25_index = Bm25Index.build(chunks)
@@ -36,6 +36,7 @@ def build_indices() -> None:
     vector_index.ensure_collection(settings.embedding_dim)
     vector_index.upsert_chunks(chunks, embedder)
     logger.info("Done.")
+    return len(chunks)
 
 
 if __name__ == "__main__":
