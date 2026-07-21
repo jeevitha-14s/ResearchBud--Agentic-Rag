@@ -12,6 +12,9 @@ dependencies = [
     "qdrant-client>=1.12",
     "sentence-transformers>=3.3",
     "rank-bm25>=0.2.2",
+    "langgraph>=0.2",
+    "anthropic>=0.40",
+    "openai>=1.55",
 ]
 
 [dependency-groups]
@@ -45,6 +48,10 @@ exclude = ["streamlit_app"]
 [[tool.mypy.overrides]]
 module = "rank_bm25.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "src.agents.graph"
+disable_error_code = ["call-overload"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

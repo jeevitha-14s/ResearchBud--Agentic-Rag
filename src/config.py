@@ -1,4 +1,12 @@
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# pydantic-settings' env_file only populates fields declared on Settings below —
+# it does not export them into os.environ. Third-party SDKs that read
+# credentials directly from the environment (anthropic.Anthropic(),
+# openai.OpenAI()) need this explicit load to see ANTHROPIC_API_KEY /
+# OPENAI_API_KEY from .env.
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -28,6 +36,13 @@ class Settings(BaseSettings):
     rrf_k: int = 60
     search_candidate_pool: int = 20
     search_default_top_k: int = 5
+
+    llm_provider: str = "anthropic"
+    llm_model: str = "claude-sonnet-5"
+    llm_max_retries: int = 3
+    max_rewrites: int = 2
+    min_relevant_chunks: int = 1
+    agent_retrieval_top_k: int = 5
 
 
 settings = Settings()

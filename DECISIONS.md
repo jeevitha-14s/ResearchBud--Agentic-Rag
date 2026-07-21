@@ -152,3 +152,58 @@ Qdrant, real HTTP request to `/search`).
    `uv run mypy src` directly against the project's own venv — one mypy
    environment for the whole project instead of two that can drift or,
    in this case, become impractically slow.
+
+## Phase 4: Agentic Nodes (guardrail → retrieve → grade → rewrite → generate)
+
+**What we built:** a LangGraph `StateGraph` wiring guardrail → retrieve →
+grade → rewrite → generate, with conditional routing (off-topic queries
+skip straight to a rejection; too-few-relevant-chunks routes to rewrite and
+loops back to retrieve, capped at `max_rewrites`). A provider-agnostic
+`src/services/llm.py` (Claude or OpenAI, swappable via `LLM_PROVIDER`), a
+`POST /chat` endpoint, and `src/agent_cli.py` for terminal testing. 58
+tests total (23 new this phase) — node-level unit tests with a fake LLM
+client, full-graph routing tests (reject path, rewrite-then-succeed,
+rewrite-cap-exhausted), and a mocked `/chat` endpoint test. Verified live
+with a real Anthropic API key: correct guardrail accept/reject on real
+queries, correct grading (2 of 5 chunks kept on one real query), and a
+well-cited final answer over the Phase 2/3 corpus.
+
+**Alternatives considered:**
+- Hardcoding one LLM provider instead of a swappable abstraction.
+- `claude-opus-4-8` as the default model instead of `claude-sonnet-5`.
+- Per-chunk grading (N LLM calls) instead of one batched call.
+- An unbounded rewrite loop instead of a hard cap.
+
+**Why we chose what we chose:**
+- Provider-agnostic LLM client: CLAUDE.md's tech stack explicitly requires
+  "Claude API or OpenAI API... swappable via env var."
+- `claude-sonnet-5` default, not Opus: a single query can trigger up to 4
+  LLM calls in this graph (guardrail, grade, rewrite, generate) — Sonnet 5
+  reaches near-Opus quality on agentic work at a fraction of the cost,
+  which is the right trade-off for a multi-call-per-turn pipeline, not a
+  single high-stakes call.
+- Batched grading over per-chunk: one call seeing all candidates at once is
+  cheaper, faster, and lets the model compare candidates against each
+  other rather than judging each in isolation.
+- Hard-capped rewrite loop: guarantees the graph terminates and bounds
+  cost per query on out-of-corpus questions, at the cost of occasionally
+  giving up one rewrite early.
+
+**Real problems hit:** see "Common failure stories & fixes" in
+`specs/04-agentic-nodes.md` — two, both caught by tests/live runs, not
+invented:
+1. A designed-in mitigation ("on unparseable grading response, treat all
+   chunks as relevant") turned out to be dead code — `_parse_relevant_indices`
+   degrades to an empty set on garbage text rather than raising, so the
+   `except ValueError/IndexError` branch was structurally unreachable.
+   Fixed by deleting the dead code; the natural "zero relevant chunks"
+   degradation is actually safer than the originally-designed fallback
+   anyway, since it can't inject irrelevant context into the final answer.
+2. `pydantic-settings`' `env_file=".env"` only populates its own `Settings`
+   object — it never exports into `os.environ`. The `anthropic` SDK's
+   zero-arg client resolves credentials from `os.environ` directly, so the
+   first live run failed with an authentication error even though the key
+   was correctly sitting in `.env`. Fixed by calling `load_dotenv()`
+   explicitly in `src/config.py` before `Settings()` is constructed, so
+   both our own config and any third-party SDK reading the environment
+   directly see the same values.
