@@ -10,4 +10,4 @@ repos:
     rev: v1.13.0
     hooks:
       - id: mypy
-        additional_dependencies: [pydantic, pydantic-settings, fastapi]
+        additional_dependencies: [pydantic, pydantic-settings, fastapi, httpx, pdfplumber, pytest]
