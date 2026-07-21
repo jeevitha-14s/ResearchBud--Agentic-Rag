@@ -13,6 +13,7 @@ from src.config import settings
 from src.services.bm25_index import Bm25Index
 from src.services.embeddings import Embedder
 from src.services.llm import LLMClient
+from src.services.tracing import observe
 from src.services.vector_index import VectorIndex
 
 CompiledGraph = CompiledStateGraph[Any, Any, Any, Any]
@@ -68,3 +69,9 @@ def initial_state(query: str) -> AgentState:
         rejected=False,
         trace=[],
     )
+
+
+@observe(name="agentic_rag_pipeline")
+def run_graph(graph: CompiledGraph, query: str) -> dict[str, Any]:
+    result: dict[str, Any] = graph.invoke(initial_state(query))
+    return result

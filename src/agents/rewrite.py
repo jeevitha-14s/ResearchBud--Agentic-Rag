@@ -3,6 +3,7 @@ from typing import Any
 
 from src.agents.state import AgentState
 from src.services.llm import LLMClient
+from src.services.tracing import observe
 
 REWRITE_SYSTEM_PROMPT = (
     "You rewrite search queries to improve retrieval from a corpus of arXiv "
@@ -14,6 +15,7 @@ REWRITE_SYSTEM_PROMPT = (
 
 
 def make_rewrite_node(llm_client: LLMClient) -> Callable[[AgentState], dict[str, Any]]:
+    @observe(name="rewrite_node")
     def rewrite_node(state: AgentState) -> dict[str, Any]:
         rewritten = llm_client.complete(REWRITE_SYSTEM_PROMPT, state["query"], max_tokens=100)
         rewritten = rewritten.strip() or state["query"]

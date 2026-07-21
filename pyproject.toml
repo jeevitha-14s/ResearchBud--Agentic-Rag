@@ -15,6 +15,9 @@ dependencies = [
     "langgraph>=0.2",
     "anthropic>=0.40",
     "openai>=1.55",
+    "langfuse>=2.53",
+    "redis>=5.2",
+    "slowapi>=0.1.9",
 ]
 
 [dependency-groups]

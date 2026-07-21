@@ -5,6 +5,7 @@ from src.models.search import SearchResult
 from src.services.bm25_index import Bm25Index
 from src.services.embeddings import Embedder
 from src.services.rrf import reciprocal_rank_fusion
+from src.services.tracing import observe
 from src.services.vector_index import VectorIndex
 
 
@@ -33,11 +34,13 @@ def _hydrate(ranked: list[tuple[int, float]]) -> list[SearchResult]:
     return results
 
 
+@observe(name="bm25_search")
 def bm25_search(bm25_index: Bm25Index, query: str, top_k: int) -> list[SearchResult]:
     ranked = bm25_index.search(query, top_k)
     return _hydrate(ranked)
 
 
+@observe(name="vector_search")
 def vector_search(
     vector_index: VectorIndex, embedder: Embedder, query: str, top_k: int
 ) -> list[SearchResult]:
@@ -46,6 +49,7 @@ def vector_search(
     return _hydrate(ranked)
 
 
+@observe(name="hybrid_search")
 def hybrid_search(
     bm25_index: Bm25Index,
     vector_index: VectorIndex,

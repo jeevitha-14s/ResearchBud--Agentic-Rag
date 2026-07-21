@@ -1,10 +1,11 @@
 import argparse
 
-from src.agents.graph import build_graph, initial_state
+from src.agents.graph import build_graph, run_graph
 from src.config import settings
 from src.services.bm25_index import Bm25Index
 from src.services.embeddings import EmbeddingModel
 from src.services.llm import get_llm_client
+from src.services.tracing import flush_traces
 from src.services.vector_index import VectorIndex
 
 
@@ -19,13 +20,15 @@ def main() -> None:
     llm_client = get_llm_client()
 
     graph = build_graph(bm25_index, vector_index, embedder, llm_client)
-    result = graph.invoke(initial_state(args.query))
+    result = run_graph(graph, args.query)
 
     print("--- Trace ---")
     for step in result["trace"]:
         print(f"  {step}")
     print("\n--- Answer ---")
     print(result["answer"])
+
+    flush_traces()
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ from typing import Any
 
 from src.agents.state import AgentState
 from src.services.llm import LLMClient
+from src.services.tracing import observe
 
 GUARDRAIL_SYSTEM_PROMPT = (
     "You are a strict classifier. Decide whether the user's question is about "
@@ -18,6 +19,7 @@ REJECTION_MESSAGE = (
 
 
 def make_guardrail_node(llm_client: LLMClient) -> Callable[[AgentState], dict[str, Any]]:
+    @observe(name="guardrail_node")
     def guardrail_node(state: AgentState) -> dict[str, Any]:
         query = state["query"].strip()
         if not query:

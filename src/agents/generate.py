@@ -3,6 +3,7 @@ from typing import Any
 
 from src.agents.state import AgentState
 from src.services.llm import LLMClient
+from src.services.tracing import observe
 
 GENERATE_SYSTEM_PROMPT = (
     "You answer questions using only the provided context passages from "
@@ -24,6 +25,7 @@ def _build_user_prompt(query: str, chunks: list[tuple[str, str, str]]) -> str:
 
 
 def make_generate_node(llm_client: LLMClient) -> Callable[[AgentState], dict[str, Any]]:
+    @observe(name="generate_node")
     def generate_node(state: AgentState) -> dict[str, Any]:
         graded = state["graded"]
         if not graded:

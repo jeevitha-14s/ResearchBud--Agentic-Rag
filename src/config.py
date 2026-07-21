@@ -44,5 +44,13 @@ class Settings(BaseSettings):
     min_relevant_chunks: int = 1
     agent_retrieval_top_k: int = 5
 
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_host: str = "https://cloud.langfuse.com"
+
+    redis_cache_ttl_seconds: int = 3600
+    rate_limit_search: str = "30/minute"
+    rate_limit_chat: str = "10/minute"
+
 
 settings = Settings()

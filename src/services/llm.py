@@ -5,6 +5,7 @@ import openai
 
 from src.config import settings
 from src.services.retry import with_retry
+from src.services.tracing import observe
 
 
 class LLMClient(Protocol):
@@ -17,6 +18,7 @@ class AnthropicLLMClient:
         self._model = model or settings.llm_model
         self._max_retries = max_retries or settings.llm_max_retries
 
+    @observe(name="anthropic_complete", as_type="generation")
     def complete(self, system: str, user: str, max_tokens: int) -> str:
         @with_retry(max_retries=self._max_retries)
         def _call() -> str:
@@ -40,6 +42,7 @@ class OpenAILLMClient:
         self._model = model or settings.llm_model
         self._max_retries = max_retries or settings.llm_max_retries
 
+    @observe(name="openai_complete", as_type="generation")
     def complete(self, system: str, user: str, max_tokens: int) -> str:
         @with_retry(max_retries=self._max_retries)
         def _call() -> str:

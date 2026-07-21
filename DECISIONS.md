@@ -207,3 +207,69 @@ invented:
    explicitly in `src/config.py` before `Settings()` is constructed, so
    both our own config and any third-party SDK reading the environment
    directly see the same values.
+
+## Phase 5: Observability + Caching (Langfuse + Redis + slowapi)
+
+**What we built:** Langfuse tracing on every node/search/LLM call (via
+`@observe(...)`), Redis-backed response caching on `/search` and `/chat`,
+and slowapi rate limiting backed by the same Redis instance
+(`in_memory_fallback_enabled=True` for resilience). Langfuse Cloud, not
+self-hosted — CLAUDE.md caps Docker Compose at 3 services (app, Qdrant,
+Redis), leaving no room for a 4th container. Tracing degrades to a silent
+no-op when Langfuse credentials aren't configured, same trade-off as the
+LLM keys in Phase 4. 78 tests total (10 new this phase — cache hit/miss/
+error-degrades-to-miss, and rate-limit under/over threshold). Verified
+fully live: cache hit made `/chat` ~375x faster on a repeat query (9.4s →
+0.025s, byte-identical response), rate limiting correctly 429'd after the
+configured threshold, and a real trace was confirmed end-to-end in
+Langfuse (via their API, not just "it didn't crash") with proper
+parent/child nesting.
+
+**Alternatives considered:**
+- Self-hosted Langfuse as a 4th Compose service instead of Langfuse Cloud.
+- Only tracing the top-level pipeline entrypoint instead of every layer.
+- Caching individual sub-steps (e.g. just embeddings) instead of full
+  endpoint responses.
+- In-memory rate limiting instead of Redis-backed.
+
+**Why we chose what we chose:**
+- Langfuse Cloud: self-hosting needs at least one more container (Langfuse
+  plus its own datastore), which directly violates CLAUDE.md's explicit
+  3-service cap — an external SaaS dependency is the trade-off for staying
+  within that constraint.
+- Wrap every layer with tracing: a trace showing only total latency can't
+  answer "which node was slow" or "how many rewrites happened" — most of
+  tracing's diagnostic value requires per-layer spans, not just a
+  top-level timer.
+- Full-response caching: this project's cost/latency driver is LLM calls
+  (up to 4 per query), so caching at the response level means a repeated
+  question skips the *entire* pipeline, not just one sub-step.
+- Redis-backed rate limiting: reuses infrastructure already required for
+  caching, and (unlike in-memory) is correct if the app ever runs as more
+  than one process/worker.
+
+**Real problems hit:** see "Common failure stories & fixes" in
+`specs/05-observability-caching.md` — three, all caught by tests or live
+verification, not invented:
+1. A stray Redis server running natively on the host (outside Docker,
+   unrelated to this project) silently broke test isolation once caching
+   was wired in — two tests using the same query text shared a cache
+   entry across test boundaries. Fixed with an autouse `conftest.py`
+   fixture forcing every test through the cache's error-degrades-to-miss
+   path deterministically, regardless of what Redis is reachable on the
+   test-running machine.
+2. Traces weren't nested — every `@observe`-decorated function became its
+   own top-level trace, because nothing wrapped the actual entrypoint
+   (`graph.invoke(...)`) in a parent span. Fixed by adding a `run_graph()`
+   helper decorated with `@observe(name="agentic_rag_pipeline")` that both
+   `agent_cli.py` and the `/chat` router now call instead of invoking the
+   graph directly — confirmed via the Langfuse API that every observation
+   in a real run now has a non-null parent.
+3. Running `pytest` itself sent real trace data to Langfuse Cloud once
+   real credentials were in `.env` for live verification — test code
+   exercises the real `@observe`-decorated functions even when the
+   underlying SDK client is mocked. Fixed by neutralizing
+   `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` at the very top of
+   `conftest.py`, before any `src.*` import, exploiting the fact that
+   `load_dotenv()` doesn't override an already-set env var. Verified via
+   before/after trace-timestamp checks against the real Langfuse API.

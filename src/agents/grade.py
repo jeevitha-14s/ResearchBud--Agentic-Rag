@@ -4,6 +4,7 @@ from typing import Any
 
 from src.agents.state import AgentState
 from src.services.llm import LLMClient
+from src.services.tracing import observe
 
 GRADE_SYSTEM_PROMPT = (
     "You grade retrieved passages for relevance to a question. You will be "
@@ -27,6 +28,7 @@ def _parse_relevant_indices(response: str, num_chunks: int) -> set[int]:
 
 
 def make_grade_node(llm_client: LLMClient) -> Callable[[AgentState], dict[str, Any]]:
+    @observe(name="grade_node")
     def grade_node(state: AgentState) -> dict[str, Any]:
         retrieved = state["retrieved"]
         if not retrieved:
