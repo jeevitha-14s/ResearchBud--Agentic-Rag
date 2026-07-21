@@ -102,3 +102,53 @@ own isolated environment governed by `additional_dependencies` in
 `Any` instead of erroring on missing stubs. Fixed by adding all three to
 the hook's dependency list. Every new dependency added to `pyproject.toml`
 now needs a matching update there too.
+
+## Phase 3: Search — BM25 + Hybrid RRF
+
+**What we built:** BM25 keyword search (`rank_bm25`, persisted to disk),
+vector search (`sentence-transformers` embeddings upserted into Qdrant),
+and Reciprocal Rank Fusion combining both into a hybrid ranking — built and
+compared together in one phase per CLAUDE.md. Plus a comparison CLI
+(`src/search_cli.py`) that prints BM25/vector/hybrid results side by side,
+an index-build script (`src/index.py`), and a `GET /search` endpoint. 37
+tests total (18 new this phase), all passing; verified live against the
+Phase 2 ingested papers through Docker Compose (real embeddings, real
+Qdrant, real HTTP request to `/search`).
+
+**Alternatives considered:**
+- Jina AI or OpenAI/Claude embeddings APIs instead of local
+  `sentence-transformers`.
+- Weighted score normalization or a cross-encoder re-ranker instead of RRF.
+- Rebuilding the BM25 index in-memory at every app startup instead of
+  persisting it to disk.
+- Auto-indexing during ingestion instead of a separate `src/index.py` step.
+
+**Why we chose what we chose:**
+- `sentence-transformers`: fully offline, no API key or per-call cost,
+  deterministic output — worth the `torch`-sized dependency because
+  embeddings are this phase's actual value, unlike Phase 2's `docling`
+  rejection where a lighter alternative existed.
+- RRF over weighted score normalization: BM25 and cosine scores live on
+  incomparable scales; RRF only needs rank position, avoiding a fragile
+  normalization/weighting hyperparameter to tune and defend.
+- Persisted BM25 index + separate `src/index.py`: decouples "add papers"
+  (Phase 2) from "pay indexing cost," and avoids re-tokenizing the whole
+  corpus on every FastAPI restart.
+
+**Real problems hit:** see "Common failure stories & fixes" in
+`specs/03-search-bm25-hybrid-rrf.md` — two, both worth remembering:
+1. BM25's IDF formula evaluates to exactly zero when a term appears in
+   exactly half the documents of a very small corpus (`N = 2n`), which
+   silently dropped a genuinely relevant result past our `score > 0`
+   filter. Not a library bug — a real, documented small-corpus edge case,
+   directly related to this project's own stated known limitation
+   (`rank_bm25`/SQLite don't scale, by design).
+2. Adding `sentence-transformers` to the pre-commit mypy hook's
+   `additional_dependencies` (the fix that worked fine in Phase 2 for
+   lighter packages) made `pre-commit run --all-files` time out after 3+
+   minutes — it tried to install `torch` a second time into a fully
+   separate isolated environment. Fixed by replacing the `mirrors-mypy`
+   repo hook with a `local`/`language: system` hook running
+   `uv run mypy src` directly against the project's own venv — one mypy
+   environment for the whole project instead of two that can drift or,
+   in this case, become impractically slow.

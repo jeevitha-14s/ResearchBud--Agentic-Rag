@@ -21,5 +21,13 @@ class Settings(BaseSettings):
     chunk_size_chars: int = 1500
     chunk_overlap_chars: int = 200
 
+    qdrant_collection_name: str = "arxiv_chunks"
+    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_dim: int = 384
+    bm25_index_path: str = "data/bm25_index.pkl"
+    rrf_k: int = 60
+    search_candidate_pool: int = 20
+    search_default_top_k: int = 5
+
 
 settings = Settings()

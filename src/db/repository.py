@@ -67,6 +67,10 @@ class PaperRepository:
         row = self._conn.execute("SELECT * FROM papers WHERE arxiv_id = ?", (arxiv_id,)).fetchone()
         return _row_to_paper(row) if row else None
 
+    def get_by_id(self, paper_id: int) -> Paper | None:
+        row = self._conn.execute("SELECT * FROM papers WHERE id = ?", (paper_id,)).fetchone()
+        return _row_to_paper(row) if row else None
+
     def mark_ingested(self, paper_id: int, pdf_path: str) -> None:
         self._conn.execute(
             "UPDATE papers SET pdf_path = ?, ingested_at = ? WHERE id = ?",
@@ -106,4 +110,12 @@ class ChunkRepository:
         rows = self._conn.execute(
             "SELECT * FROM chunks WHERE paper_id = ? ORDER BY chunk_index", (paper_id,)
         ).fetchall()
+        return [_row_to_chunk(row) for row in rows]
+
+    def get_by_id(self, chunk_id: int) -> Chunk | None:
+        row = self._conn.execute("SELECT * FROM chunks WHERE id = ?", (chunk_id,)).fetchone()
+        return _row_to_chunk(row) if row else None
+
+    def get_all(self) -> list[Chunk]:
+        rows = self._conn.execute("SELECT * FROM chunks ORDER BY id").fetchall()
         return [_row_to_chunk(row) for row in rows]
