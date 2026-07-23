@@ -198,34 +198,19 @@ uv run python -m src.evaluate
 
 ### Real numbers from a live run
 
-```text
-Retrieval:  mean precision 0.82, mean recall 1.00 (9 queries, 3 papers)
-Guardrail:  100% accuracy (8 queries)
+| Metric | Result |
+|---|---|
+| Retrieval precision (mean) | 0.82 (9 queries, 3 papers) |
+| Retrieval recall (mean) | 1.00 (9 queries, 3 papers) |
+| Guardrail accuracy | 100% (8 queries) |
 
-Faithfulness, per category (answer_rate / mean_faithfulness):
-  in_corpus:      naive 100% / 4.50    agentic  50% / 4.00
-  out_of_corpus:  naive 100% / 5.00    agentic   0% / n/a
-  off_topic:      naive 100% / 5.00    agentic   0% / n/a
-```
+**Faithfulness by category — naive RAG vs. agentic RAG**
 
-The headline finding isn't the faithfulness *score* — naive RAG scores respectably even on questions it shouldn't answer, because the same system prompt nudges it to admit uncertainty in prose. The finding is the **answer rate**: agentic RAG structurally refuses 100% of out-of-corpus and off-topic questions before generation ever runs (guardrail rejection, or grading filtering out every retrieved chunk) — a guarantee, not a hope. Naive RAG's "refusal" on those same questions is voluntary LLM behavior with no structural backing, and isn't guaranteed to hold on a different run or model. The trade-off: the guardrail also false-rejected one legitimate in-corpus question in this run, dropping agentic RAG's in-corpus answer rate to 50%.
-
----
-
-## Production Readiness
-
-This ships as a documented, runnable Docker Compose stack, not a live hosted deployment — provisioning and paying for a public cloud VM is a decision left to whoever deploys this, not made unilaterally here.
-
-**In place:**
-* **Secrets** — read from `.env` (gitignored), never hardcoded; `.env.example` documents every variable with no real values.
-* **Health checks** — `app` and `redis` have Compose healthchecks; `app` waits on `redis` being healthy.
-* **Restart policy** — all three services run `restart: unless-stopped`.
-
-**Known gaps if deploying this for real** (deliberate, not overlooked):
-* `app`'s `uvicorn --reload` and bind-mounted `./src` are dev conveniences — a production image should drop `--reload` and use the baked-in `COPY . .` layer.
-* `qdrant` has no Compose healthcheck (its image ships no `curl`/`wget`), so `depends_on` for it is `service_started`, not `service_healthy`.
-* No resource limits (`mem_limit`/`cpus`) are set on any service.
-* No TLS termination — assumes a reverse proxy (e.g. Caddy/nginx) or a managed platform's ingress handles HTTPS in front of `app`.
+| Category | Naive answer rate | Naive faithfulness | Agentic answer rate | Agentic faithfulness |
+|---|---|---|---|---|
+| In-corpus | 100% | 4.50 | 50% | 4.00 |
+| Out-of-corpus | 100% | 5.00 | 0% | n/a |
+| Off-topic | 100% | 5.00 | 0% | n/a |
 
 ---
 
@@ -291,30 +276,6 @@ mypy src
 
 ---
 
-## Future Improvements
-
-* Elasticsearch/OpenSearch for large-scale BM25 indexing
-* PostgreSQL metadata storage
-* Incremental (rather than full-rebuild) index updates
-* Background ingestion workers / async document processing
-* Multi-user authentication
-* Streaming LLM responses
-* CI/CD pipeline
-* Larger, more diverse retrieval evaluation datasets
-
----
-
-## Key Design Decisions
-
-* Hybrid retrieval instead of vector-only search
-* Rank fusion instead of weighted score normalization
-* Agentic retrieval with iterative self-correction over a single-shot call
-* SQLite for lightweight metadata storage; `rank_bm25` for in-process keyword search — explicit trade-off against OpenSearch/Postgres at this project's scale
-* Provider-agnostic LLM interface (Claude or OpenAI via env var, no local LLM)
-* LangGraph for an explicit, inspectable reasoning flow
-* Dockerized deployment for reproducibility
-
----
 
 ## Key Learnings
 
